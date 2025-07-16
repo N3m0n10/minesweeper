@@ -3,7 +3,7 @@
 
 # Download the Game:
 
-git clone [https://github.com/AnonAmosAdmn/minesweeper.py.git](https://github.com/AnonAmosAdmn/minesweeper.git)
+git clone [https://github.com/AnonAmosAdmn/minesweeper.git](https://github.com/AnonAmosAdmn/minesweeper.git)
 
 ===============================================================
 
