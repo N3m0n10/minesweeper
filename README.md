@@ -12,4 +12,4 @@
    #### 2. Proper substitute font setting
    #### 3. Timer added
 
-## Note: To not change much the original timer in the easy does not fit the header
+## Note: To not change much the original, the timer in the easy does not fit the header
