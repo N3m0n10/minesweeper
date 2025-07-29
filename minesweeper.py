@@ -71,6 +71,104 @@ def load_base64_image(base64_string, size=(GRID_SIZE, GRID_SIZE)):
     image = pygame.image.load(bmp_buffer)
     return pygame.transform.scale(image, size)
 
+class Segment_display:
+    def __init__(self):
+        self.numbers = {
+            '0': '1111110', '1': '0110000', '2': '1101101', '3': '1111001',
+            '4': '0110011', '5': '1011011', '6': '1011111', '7': '1110000',
+            '8': '1111111', '9': '1111011'
+        }
+        self.on_color = (255, 0, 0)
+        self.off_color = (150, 0, 0)
+        self.outside_color = (30,0,0)
+        self.segment_width = 2
+        self.segment_length = 10
+        self.segment_margin = 2
+
+    def get_segments(self, x, y):
+        w = self.segment_width
+        l = self.segment_length
+        m = self.segment_margin
+        return [
+            pygame.Rect(x + m, y, l, w),              # top
+            pygame.Rect(x + l + m, y + m, w, l),      # top-right
+            pygame.Rect(x + l + m, y + l + 2*m, w, l),# bottom-right
+            pygame.Rect(x + m, y + 2*l + 2*m, l, w),  # bottom
+            pygame.Rect(x, y + l + 2*m, w, l),        # bottom-left
+            pygame.Rect(x, y + m, w, l),              # top-left
+            pygame.Rect(x + m, y + l + m, l, w),      # middle
+        ]
+
+    def draw_digit(self, screen, digit, x, y, off= False): ## TODO: add it direct to timer and make the rect a surface so the whole timer can be resized easely
+        segments = self.get_segments(x, y)
+        bitstring = self.numbers.get(digit, '0000000')
+        for idx, bit in enumerate(bitstring):
+            if off:
+                color = self.on_color if bit == '0' else self.off_color
+            else: color = self.on_color if bit == '1' else self.off_color
+            pygame.draw.rect(screen, color, segments[idx])
+
+class Timer(Segment_display):
+    def __init__(self):
+        super().__init__()
+        self.start_time = 0
+        self.elapsed_time = 0
+        self.on = False
+        self.rect_pos = (WINDOW_WIDTH*0.55, HEADER_HEIGHT // 2 - 15)
+        self.surface_rect = pygame.Rect(
+            self.rect_pos,
+            (65, 30)
+        )
+
+    def update(self, screen):
+        if self.on:
+            current_time = pygame.time.get_ticks()
+            self.elapsed_time = (current_time - self.start_time) // 1000
+
+        pygame.draw.rect(screen, self.outside_color, self.surface_rect)
+
+        # Display digits as segment display
+        digits, empty = self.display()
+        for i, digit in enumerate(digits):
+            if i + 1 <= empty:
+                self.draw_digit(screen, digit, (self.rect_pos[0] + 5) + i*20, self.rect_pos[1] + 2, off=True)
+            else:
+                self.draw_digit(screen, digit, (self.rect_pos[0] + 5) + i*20, self.rect_pos[1] + 2)
+
+    def display(self):
+        disp_nums = str(min(self.elapsed_time, 999))
+        empty = 0
+        while len(disp_nums) < 3:
+            disp_nums = '8' + disp_nums
+            empty += 1
+        return disp_nums , empty
+
+    def start(self):
+        self.on = True
+        self.start_time = pygame.time.get_ticks()
+        self.elapsed_time = 0
+
+    def reset(self):
+        self.on = False
+        self.elapsed_time = 0
+        self.reposit()
+
+    def off(self):
+        self.on = False
+
+    def reposit(self):
+        self.rect_pos = (WINDOW_WIDTH*0.55, HEADER_HEIGHT // 2 - 15)
+        self.surface_rect = pygame.Rect(
+            self.rect_pos,
+            (65, 30)
+        )
+
+    @staticmethod  # Probably won't use
+    def convert_sec_to_min(sec):
+        min = sec // 60
+        sec = sec % 60
+        return min,sec
+
 class ImageCache:
     def __init__(self):
         self.cache = {}
@@ -104,9 +202,9 @@ pygame.display.set_caption('Minesweeper with Images')
 
 # Load fonts
 try:
-    number_font = pygame.font.SysFont('Arial', FONT_SIZE - 10, bold=True)
-    header_font = pygame.font.SysFont('Arial', 30)
-    menu_font = pygame.font.SysFont('Arial', 20)
+    number_font = pygame.font.SysFont('arpluminghk', FONT_SIZE - 10, bold=True)
+    header_font = pygame.font.SysFont('arpluminghk', 30)
+    menu_font = pygame.font.SysFont('arpluminghk', 20)
 except:
     print("Warning: Using fallback fonts.")
     number_font = pygame.font.SysFont('Arial', FONT_SIZE - 10, bold=True)
@@ -115,6 +213,7 @@ except:
 
 class MinesweeperGame:
     def __init__(self):
+        self.timer = Timer()
         self.set_difficulty(current_difficulty)
     
     def set_difficulty(self, difficulty):
@@ -132,7 +231,7 @@ class MinesweeperGame:
         WINDOW_HEIGHT = GRID_SIZE * CELL_SIZE + HEADER_HEIGHT
         
         # Resize the window
-        pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT), pygame.RESIZABLE)
+        pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT)) # pygame.RESIZABLE # Removed this
         
         self.reset_game()
     
@@ -148,11 +247,13 @@ class MinesweeperGame:
         
         # Initialize header text
         self.update_header()
+        self.timer.reset()
     
     def update_header(self):
         status_image = SMILE_FACE_IMAGE  # Default smile face
         if self.game_over:
             status_image = DEAD_FACE_IMAGE if not self.win else COOL_FACE_IMAGE
+            self.timer.off()
         
         self.status_img = image_cache.get_image(status_image, FONT_SIZE)
         self.header_text = f"   Mines: {self.mines_left}"
@@ -161,6 +262,8 @@ class MinesweeperGame:
     def place_mines(self, first_click_row, first_click_col):
         # Place mines randomly, avoiding the first click position and adjacent cells
         safe_zone = set()
+
+        # Coment follow loop for instant kill chance
         for r in range(max(0, first_click_row-1), min(GRID_SIZE, first_click_row+2)):
             for c in range(max(0, first_click_col-1), min(GRID_SIZE, first_click_col+2)):
                 safe_zone.add((r, c))
@@ -198,6 +301,7 @@ class MinesweeperGame:
             
         if self.first_click:
             self.place_mines(row, col)
+            self.timer.start()
             self.first_click = False
             
         self.revealed[row][col] = True
@@ -262,26 +366,13 @@ class MinesweeperGame:
         header_surface = header_font.render(self.header_text, True, BLACK)
         header_text_rect = header_surface.get_rect(midright=(WINDOW_WIDTH - 10, HEADER_HEIGHT//2))
         surface.blit(header_surface, header_text_rect)
+
+        # Draw timer
+        self.timer.update(surface)
         
-        # Draw restart button if game is over (centered in header)
-        if self.game_over:
-            button_width = 120
-            button_height = 40
-            restart_button = pygame.Rect(
-                (WINDOW_WIDTH - button_width) // 2,  # Centered horizontally
-                (HEADER_HEIGHT - button_height) // 2,  # Centered vertically
-                button_width,
-                button_height
-            )
-            pygame.draw.rect(surface, (200, 50, 50), restart_button)
-            pygame.draw.rect(surface, BLACK, restart_button, 2)
-            restart_text = menu_font.render("Restart", True, WHITE)
-            restart_text_rect = restart_text.get_rect(center=restart_button.center)
-            surface.blit(restart_text, restart_text_rect)
-        else:
-            # Draw status image (smiley face) - centered horizontally when game is not over
-            status_rect = self.status_img.get_rect(center=(WINDOW_WIDTH//2, HEADER_HEIGHT//2))
-            surface.blit(self.status_img, status_rect)
+        # Draw smile face or skull
+        status_rect = self.status_img.get_rect(center=(WINDOW_WIDTH//2, HEADER_HEIGHT//2))
+        surface.blit(self.status_img, status_rect)
         
         # Draw grid
         for row in range(GRID_SIZE):
@@ -321,9 +412,9 @@ class MinesweeperGame:
                         img_rect = flag_img.get_rect(center=rect.center)
                         surface.blit(flag_img, img_rect)
 
-def draw_menu(surface, game):
+def draw_menu(surface):
     # Draw difficulty selection menu
-    menu_rect = pygame.Rect(WINDOW_WIDTH//2 - 100, HEADER_HEIGHT + 50, 200, 150)
+    menu_rect = pygame.Rect(WINDOW_WIDTH//2 - 100, HEADER_HEIGHT + 50, 200, 170)
     pygame.draw.rect(surface, WHITE, menu_rect)
     pygame.draw.rect(surface, BLACK, menu_rect, 2)
     
@@ -388,7 +479,7 @@ def main():
                 
                 if show_menu:
                     # Check difficulty selection
-                    easy_rect, med_rect, hard_rect = draw_menu(window, game)
+                    easy_rect, med_rect, hard_rect = draw_menu(window)
                     if easy_rect.collidepoint(x, y):
                         game.set_difficulty('easy')
                         show_menu = False
@@ -414,7 +505,7 @@ def main():
         game.draw(window)
         
         if show_menu:
-            draw_menu(window, game)
+            draw_menu(window)
         
         pygame.display.update()
         clock.tick(30)

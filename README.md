@@ -1,30 +1,15 @@
 
-===============================================================
+# Adding 7 segment display timer:
 
-# Download the Game:
+#### I've seen this game on reddit, the original is:
 
-git clone [https://github.com/AnonAmosAdmn/minesweeper.git](https://github.com/AnonAmosAdmn/minesweeper.git)
+[https://github.com/AnonAmosAdmn/minesweeper.git](https://github.com/AnonAmosAdmn/minesweeper.git)
 
-===============================================================
+#### Instructions here
 
-# Create a Virtual Environment:
+### Changes:
+   #### 1. No retangular start button, just skull emoji.
+   #### 2. Proper substitute font setting
+   #### 3. Timer added
 
-python -m venv mygame_env
-
-source mygame_env/bin/activate  # Linux/macOS
-
-mygame_env\Scripts\activate     # Windows
-
-===============================================================
-
-# Then install Pygame:
-
-pip install pygame
-
-===============================================================
-
-# Run the game :
-
-python3 minesweeper.py
-
-===============================================================
+## Note: To not change much the original timer in the easy does not fit the header
